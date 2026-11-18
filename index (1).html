@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Code Nutri: Clinical Nutrition Rounds</title>
+  <style>
+    :root {
+      --bg: #f4f7f9;
+      --card: #ffffff;
+      --primary: #0f62fe;
+      --primary-hover: #0043ce;
+      --text: #161616;
+      --muted: #525252;
+      --border: #e0e0e0;
+      --correct-bg: #defbe6;
+      --correct-border: #24a148;
+      --wrong-bg: #fff1f1;
+      --wrong-border: #da1e28;
+    }
+
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { margin: 0; background: var(--bg); color: var(--text); display: flex; flex-direction: column; align-items: center; padding: 20px; }
+    .container { max-width: 760px; width: 100%; background: var(--card); border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); padding: 28px; }
+    
+    header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border); padding-bottom: 14px; margin-bottom: 20px; }
+    header h1 { font-size: 1.35rem; margin: 0; color: var(--primary); }
+    .score-badge { background: #edf5ff; color: var(--primary); font-weight: 700; padding: 6px 14px; border-radius: 20px; font-size: 0.95rem; }
+
+    .patient-box { background: #f8fafc; border-left: 4px solid var(--primary); padding: 14px 18px; border-radius: 6px; margin-bottom: 20px; }
+    .patient-box h2 { margin: 0 0 6px 0; font-size: 1.15rem; }
+    .patient-box p { margin: 0; color: var(--muted); font-size: 0.95rem; line-height: 1.45; }
+
+    .stage-tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+    .tab { flex: 1; min-width: 120px; text-align: center; padding: 8px; border-radius: 6px; font-size: 0.85rem; font-weight: 600; background: #e8eef5; color: var(--muted); }
+    .tab.active { background: var(--primary); color: #fff; }
+    .tab.done { background: #24a148; color: #fff; }
+
+    .question-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 14px; }
+    .options { display: flex; flex-direction: column; gap: 10px; }
+    button.option-btn {
+      text-align: left; padding: 14px 16px; border: 2px solid var(--border); border-radius: 8px;
+      background: #fff; font-size: 0.98rem; cursor: pointer; transition: all 0.15s ease;
+    }
+    button.option-btn:hover:not(:disabled) { border-color: var(--primary); background: #f4f8ff; }
+    button.option-btn.correct { background: var(--correct-bg); border-color: var(--correct-border); font-weight: 600; }
+    button.option-btn.wrong { background: var(--wrong-bg); border-color: var(--wrong-border); }
+    button.option-btn:disabled { cursor: default; }
+
+    .feedback { margin-top: 16px; padding: 14px; border-radius: 8px; font-size: 0.95rem; line-height: 1.45; display: none; }
+    .feedback.correct { display: block; background: var(--correct-bg); border: 1px solid var(--correct-border); }
+    .feedback.wrong { display: block; background: var(--wrong-bg); border: 1px solid var(--wrong-border); }
+
+    .next-btn {
+      margin-top: 18px; padding: 12px 22px; background: var(--primary); color: #fff; border: none;
+      border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; display: none;
+    }
+    .next-btn:hover { background: var(--primary-hover); }
+
+    .summary { text-align: center; padding: 20px 0; display: none; }
+    .summary h2 { color: var(--primary); margin-bottom: 10px; }
+    .disclaimer-footer { max-width: 760px; width: 100%; margin-top: 16px; font-size: 0.8rem; color: var(--muted); text-align: center; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>Code Nutri: Clinical Care Rounds</h1>
+    <div class="score-badge">Score: <span id="score">0</span></div>
+  </header>
+
+  <div id="game-area">
+    <div class="patient-box">
+      <h2 id="case-title">Patient Case</h2>
+      <p id="case-details">Case summary...</p>
+    </div>
+
+    <div class="stage-tabs" id="stage-tabs">
+      <div class="tab" id="tab-0">1. Pathophysiology</div>
+      <div class="tab" id="tab-1">2. Doctor</div>
+      <div class="tab" id="tab-2">3. Nurse</div>
+      <div class="tab" id="tab-3">4. Dietitian</div>
+    </div>
+
+    <div class="question-title" id="question-text">Question goes here</div>
+    <div class="options" id="options-container"></div>
+    <div class="feedback" id="feedback-box"></div>
+    <button class="next-btn" id="next-btn" onclick="nextStep()">Next Step &rarr;</button>
+  </div>
+
+  <div class="summary" id="summary-area">
+    <h2>Ward Rounds Complete!</h2>
+    <p id="final-score-text" style="font-size: 1.15rem; margin-bottom: 20px;"></p>
+    <button class="next-btn" style="display:inline-block;" onclick="restartGame()">Play Again</button>
+  </div>
+</div>
+
+<footer class="disclaimer-footer">
+  This is for informational purposes only. For medical advice or diagnosis, consult a professional. AI responses may include mistakes.
+</footer>
+
+<script>
+  const cases = [
+    {
+      title: "Case 1: Acute Pancreatitis (48M)",
+      details: "Admitted with severe epigastric pain radiating to the back, nausea, and vomiting. Labs: Lipase 1,450 U/L, WBC 15,200/µL, Glucose 198 mg/dL, Triglycerides 1,100 mg/dL.",
+      steps: [
+        {
+          role: "Pathophysiology",
+          question: "What is the primary pathophysiological mechanism driving tissue injury in acute pancreatitis?",
+          options: [
+            "Premature activation of trypsinogen to trypsin inside pancreatic acinar cells causing autodigestion.",
+            "Autoimmune destruction of pancreatic beta cells leading to immediate insulin absence.",
+            "Excessive bile acid synthesis causing mechanical obstruction of the common bile duct."
+          ],
+          correct: 0,
+          rationale: "Premature intracellular activation of digestive enzymes (especially trypsin) triggers pancreatic autodigestion, vascular injury, and systemic inflammation."
+        },
+        {
+          role: "Doctor Treatment",
+          question: "What is the doctor's priority initial medical order upon admission?",
+          options: [
+            "Aggressive goal-directed IV fluid resuscitation (Lactated Ringer's) and IV analgesia.",
+            "Immediate surgical debridement of the pancreas within the first 6 hours.",
+            "High-dose oral pancreatic enzyme replacement therapy with a full regular meal."
+          ],
+          correct: 0,
+          rationale: "Third-spacing of fluids causes severe intravascular depletion. Early goal-directed hydration with Lactated Ringer's preserves pancreatic microcirculation."
+        },
+        {
+          role: "Nurse Intervention",
+          question: "Which bedside nursing intervention is critical during the first 24 hours?",
+          options: [
+            "Monitor strict hourly urine output, vital signs, and point-of-care blood glucose.",
+            "Encourage vigorous ambulation immediately after IV opioid administration.",
+            "Clamp the nasogastric tube and force oral fluids to test bowel motility."
+          ],
+          correct: 0,
+          rationale: "Tracking urine output (>0.5 mL/kg/hr) confirms adequate fluid resuscitation, while glucose monitoring catches stress- or islet-cell-induced hyperglycemia."
+        },
+        {
+          role: "Dietitian Intervention",
+          question: "Once pain and nausea improve after 24–48 hours, what is the evidence-based nutrition intervention?",
+          options: [
+            "Initiate early low-fat oral diet or enteral nutrition (EN) rather than prolonged NPO or TPN.",
+            "Keep the patient strictly NPO for 14 days to completely rest the pancreas.",
+            "Start Total Parenteral Nutrition (TPN) with high lipid emulsion immediately."
+          ],
+          correct: 0,
+          rationale: "Early oral or enteral feeding maintains gut mucosal integrity, reduces bacterial translocation, and lowers infection risk compared to prolonged NPO or TPN."
+        }
+      ]
+    },
+    {
+      title: "Case 2: Diabetic Ketoacidosis / DKA (24F)",
+      details: "Type 1 Diabetes, missed insulin doses due to viral illness. Vitals: HR 122 bpm, RR 28 (Kussmaul respirations). Labs: Glucose 460 mg/dL, pH 7.18, HCO3 11 mEq/L, Serum K+ 5.1 mEq/L.",
+      steps: [
+        {
+          role: "Pathophysiology",
+          question: "Why does absolute insulin deficiency lead to metabolic acidosis in DKA?",
+          options: [
+            "Unchecked lipolysis releases free fatty acids that the liver converts into acidic ketone bodies.",
+            "Excessive glycogen storage in skeletal muscle blocks aerobic respiration.",
+            "Renal tubular bicarbonate reabsorption increases uncontrollably."
+          ],
+          correct: 0,
+          rationale: "Without insulin, counter-regulatory hormones trigger rapid fat breakdown (lipolysis), flooding the liver with fatty acids converted into beta-hydroxybutyrate and acetoacetate."
+        },
+        {
+          role: "Doctor Treatment",
+          question: "What is the correct sequence of initial medical treatment?",
+          options: [
+            "Start IV Normal Saline resuscitation first, verify potassium >3.3 mEq/L, then start IV regular insulin drip.",
+            "Administer a large IV bolus of sodium bicarbonate before checking electrolytes.",
+            "Start subcutaneous long-acting insulin only and restrict all IV fluids."
+          ],
+          correct: 0,
+          rationale: "Restoring intravascular volume comes first. Insulin drives potassium into cells, so potassium must be verified (>3.3 mEq/L) before starting an insulin infusion."
+        },
+        {
+          role: "Nurse Intervention",
+          question: "Which nursing action prevents life-threatening complications during IV insulin therapy?",
+          options: [
+            "Perform hourly blood glucose checks and maintain continuous cardiac telemetry monitoring.",
+            "Discontinue the IV insulin drip as soon as blood glucose drops below 250 mg/dL.",
+            "Keep the patient flat in bed without checking neurological status."
+          ],
+          correct: 0,
+          rationale: "Hourly glucose checks prevent hypoglycemia, and telemetry detects arrhythmias caused by rapid extracellular-to-intracellular potassium shifts."
+        },
+        {
+          role: "Dietitian Intervention",
+          question: "When the anion gap closes and the patient is ready to eat, what nutrition plan is appropriate?",
+          options: [
+            "Transition to a Consistent Carbohydrate (CCarb) meal plan paired with subcutaneous basal-bolus insulin.",
+            "Prescribe a strict ketogenic (zero-carbohydrate) diet to prevent future hyperglycemia.",
+            "Provide unrestricted simple sugars to rebuild liver glycogen rapidly."
+          ],
+          correct: 0,
+          rationale: "A Consistent Carbohydrate diet provides predictable glycemic load so subcutaneous mealtime insulin can be safely matched without rebound ketosis or hypoglycemia."
+        }
+      ]
+    }
+  ];
+
+  let currentCaseIdx = 0;
+  let currentStepIdx = 0;
+  let score = 0;
+
+  function loadStep() {
+    const c = cases[currentCaseIdx];
+    const s = c.steps[currentStepIdx];
+
+    document.getElementById("case-title").textContent = c.title;
+    document.getElementById("case-details").textContent = c.details;
+    document.getElementById("question-text").textContent = `[${s.role}] ${s.question}`;
+
+    for (let i = 0; i < 4; i++) {
+      const tab = document.getElementById(`tab-${i}`);
+      tab.className = "tab";
+      if (i < currentStepIdx) tab.classList.add("done");
+      if (i === currentStepIdx) tab.classList.add("active");
+    }
+
+    const optionsDiv = document.getElementById("options-container");
+    optionsDiv.innerHTML = "";
+    document.getElementById("feedback-box").className = "feedback";
+    document.getElementById("feedback-box").textContent = "";
+    document.getElementById("next-btn").style.display = "none";
+
+    s.options.forEach((optText, idx) => {
+      const btn = document.createElement("button");
+      btn.className = "option-btn";
+      btn.textContent = optText;
+      btn.onclick = () => checkAnswer(idx, btn);
+      optionsDiv.appendChild(btn);
+    });
+  }
+
+  function checkAnswer(selectedIdx, btnElement) {
+    const s = cases[currentCaseIdx].steps[currentStepIdx];
+    const buttons = document.querySelectorAll(".option-btn");
+    buttons.forEach(b => b.disabled = true);
+
+    const feedback = document.getElementById("feedback-box");
+
+    if (selectedIdx === s.correct) {
+      btnElement.classList.add("correct");
+      score += 10;
+      document.getElementById("score").textContent = score;
+      feedback.className = "feedback correct";
+      feedback.innerHTML = `<strong>Correct (+10 pts):</strong> ${s.rationale}`;
+    } else {
+      btnElement.classList.add("wrong");
+      buttons[s.correct].classList.add("correct");
+      feedback.className = "feedback wrong";
+      feedback.innerHTML = `<strong>Clinical Pearl:</strong> ${s.rationale}`;
+    }
+
+    document.getElementById("next-btn").style.display = "inline-block";
+  }
+
+  function nextStep() {
+    currentStepIdx++;
+    if (currentStepIdx < cases[currentCaseIdx].steps.length) {
+      loadStep();
+    } else {
+      currentCaseIdx++;
+      currentStepIdx = 0;
+      if (currentCaseIdx < cases.length) {
+        loadStep();
+      } else {
+        showSummary();
+      }
+    }
+  }
+
+  function showSummary() {
+    document.getElementById("game-area").style.display = "none";
+    const summary = document.getElementById("summary-area");
+    summary.style.display = "block";
+    const maxScore = cases.length * 40;
+    document.getElementById("final-score-text").textContent = `You scored ${score} out of ${maxScore} points!`;
+  }
+
+  function restartGame() {
+    currentCaseIdx = 0;
+    currentStepIdx = 0;
+    score = 0;
+    document.getElementById("score").textContent = "0";
+    document.getElementById("summary-area").style.display = "none";
+    document.getElementById("game-area").style.display = "block";
+    loadStep();
+  }
+
+  loadStep();
+</script>
+
+</body>
+</html>
